@@ -1,39 +1,49 @@
-name: "Build"
+name: Build & Deploy Aliucord Plugin
 
 on:
-  workflow_dispatch:
-  pull_request:
   push:
-    branches-ignore:
+    branches:
+      - main
+      - 'builds*'    # match any branch starting with "builds"
+  pull_request:
+    branches:
       - main
 
 jobs:
   build:
-    name: Build Plugins
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup JDK 21
-        uses: actions/setup-java@v5
+      # 1️⃣ Checkout repository with full history
+      - name: Checkout repository
+        uses: actions/checkout@v3
         with:
-          java-version: 21
-          distribution: temurin
+          fetch-depth: 0      # ensures all branches and tags are available
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+      # 2️⃣ Setup Java (Aliucord requires Java 17+)
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-      - name: Build
+      # 3️⃣ Fetch all branches and tags safely
+      - name: Fetch all branches & tags
         run: |
-          cd $GITHUB_WORKSPACE
-          chmod +x ./gradlew
-          ./gradlew make
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --tags || git fetch --all
+          git fetch origin '+refs/tags/*:refs/tags/*' --tags || echo "No tags to fetch"
+          git branch -a   # debug: list all available branches
 
-      - name: Upload plugin artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: plugins
-          if-no-files-found: error
-          path: ${{ github.workspace }}/plugins/**/build/outputs/*.zip
+      # 4️⃣ Checkout the correct branch
+      - name: Checkout branch
+        run: |
+          TARGET_BRANCH=${GITHUB_REF##*/}
+          git checkout $TARGET_BRANCH || git checkout main
+
+      # 5️⃣ Build plugin
+      - name: Build plugin
+        run: ./gradlew build
+
+      # 6️⃣ Optional: Deploy plugin (if using Aliucord deploy scripts)
+      # - name: Deploy plugin
+      #   run: ./gradlew deploy
