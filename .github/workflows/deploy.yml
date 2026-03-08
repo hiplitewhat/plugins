@@ -1,66 +1,49 @@
-name: "Deploy"
-
-concurrency:
-  group: "deploy"
-  cancel-in-progress: true
+name: Build & Deploy Aliucord Plugin
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
-
-permissions:
-  contents: write
+      - 'builds*'    # match any branch starting with "builds"
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  deploy:
-    name: Build & Deploy Plugins
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      # 1️⃣ Checkout repository with full history
+      - name: Checkout repository
+        uses: actions/checkout@v3
         with:
-          path: "src"
+          fetch-depth: 0      # ensures all branches and tags are available
 
-      - name: Checkout builds
-        uses: actions/checkout@v6
+      # 2️⃣ Setup Java (Aliucord requires Java 17+)
+      - name: Setup Java
+        uses: actions/setup-java@v3
         with:
-          ref: "builds"
-          path: "builds"
+          java-version: '17'
+          distribution: 'temurin'
 
-      - name: Setup JDK 21
-        uses: actions/setup-java@v5
-        with:
-          java-version: 21
-          distribution: temurin
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
-
-      - name: Build
+      # 3️⃣ Fetch all branches and tags safely
+      - name: Fetch all branches & tags
         run: |
-          cd $GITHUB_WORKSPACE/src
-          chmod +x ./gradlew
-          ./gradlew make :generateUpdaterJson
-          
-          rm -f $GITHUB_WORKSPACE/builds/*.zip
-          cp $GITHUB_WORKSPACE/src/plugins/**/build/outputs/*.zip $GITHUB_WORKSPACE/builds/
-          cp $GITHUB_WORKSPACE/src/build/outputs/updater.json $GITHUB_WORKSPACE/builds/
+          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --tags || git fetch --all
+          git fetch origin '+refs/tags/*:refs/tags/*' --tags || echo "No tags to fetch"
+          git branch -a   # debug: list all available branches
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: plugins
-          if-no-files-found: error
-          path: ${{ github.workspace }}/src/plugins/**/build/outputs/*.zip
-
-      - name: Push builds
+      # 4️⃣ Checkout the correct branch
+      - name: Checkout branch
         run: |
-          cd $GITHUB_WORKSPACE/builds
-          git config --local user.email "actions@github.com"
-          git config --local user.name "GitHub Actions"
-          git add .
-          git commit -m "Build $GITHUB_SHA" || exit 0   # do not error if nothing to commit
-          git push
+          TARGET_BRANCH=${GITHUB_REF##*/}
+          git checkout $TARGET_BRANCH || git checkout main
+
+      # 5️⃣ Build plugin
+      - name: Build plugin
+        run: ./gradlew build
+
+      # 6️⃣ Optional: Deploy plugin (if using Aliucord deploy scripts)
+      # - name: Deploy plugin
+      #   run: ./gradlew deploy
