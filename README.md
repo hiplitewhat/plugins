@@ -1,4 +1,4 @@
-# Aliucord Plugin Repo Template
+uu# Aliucord Plugin Repo Template
 
 The official template for a [Aliucord](https://github.com/Aliucord) plugins monorepo.
 
