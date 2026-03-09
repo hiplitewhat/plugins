@@ -1,11 +1,11 @@
 name: "Build"
 
 on:
-  workflow_dispatch:
-  pull_request:
+  workflow_dispatch: {}  # Allows manual trigger
+  pull_request: {}       # Triggers on PRs
   push:
     branches-ignore:
-      - main
+      - main            # Runs on push to branches other than main
 
 jobs:
   build:
@@ -29,10 +29,8 @@ jobs:
       - name: Build and save errors only
         run: |
           chmod +x gradlew
-          # Run Gradle; normal output goes to console, errors go to file
           ./gradlew make --no-daemon --stacktrace --info 2> gradle-error.log
           
-          # Print errors to console if any
           if [ -s gradle-error.log ]; then
             echo "Gradle errors detected:"
             cat gradle-error.log
