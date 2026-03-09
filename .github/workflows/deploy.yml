@@ -1,49 +1,49 @@
-name: Build & Deploy Aliucord Plugin
+name: "Build"
 
 on:
-  push:
-    branches:
-      - main
-      - 'builds*'    # match any branch starting with "builds"
+  workflow_dispatch:
   pull_request:
-    branches:
+  push:
+    branches-ignore:
       - main
 
 jobs:
   build:
+    name: Build Plugins
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
-      # 1️⃣ Checkout repository with full history
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v5
         with:
-          fetch-depth: 0      # ensures all branches and tags are available
+          java-version: 21
+          distribution: temurin
 
-      # 2️⃣ Setup Java (Aliucord requires Java 17+)
-      - name: Setup Java
-        uses: actions/setup-java@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Build and save errors only
+        run: |
+          chmod +x gradlew
+          # Run Gradle; normal output goes to console, errors go to file
+          ./gradlew make --no-daemon --stacktrace --info 2> gradle-error.log
+          
+          # Print errors to console if any
+          if [ -s gradle-error.log ]; then
+            echo "Gradle errors detected:"
+            cat gradle-error.log
+          else
+            echo "No errors detected."
+          fi
+
+      - name: Upload plugin artifacts
+        if: success()
+        uses: actions/upload-artifact@v6
         with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      # 3️⃣ Fetch all branches and tags safely
-      - name: Fetch all branches & tags
-        run: |
-          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --tags || git fetch --all
-          git fetch origin '+refs/tags/*:refs/tags/*' --tags || echo "No tags to fetch"
-          git branch -a   # debug: list all available branches
-
-      # 4️⃣ Checkout the correct branch
-      - name: Checkout branch
-        run: |
-          TARGET_BRANCH=${GITHUB_REF##*/}
-          git checkout $TARGET_BRANCH || git checkout main
-
-      # 5️⃣ Build plugin
-      - name: Build plugin
-        run: ./gradlew build
-
-      # 6️⃣ Optional: Deploy plugin (if using Aliucord deploy scripts)
-      # - name: Deploy plugin
-      #   run: ./gradlew deploy
+          name: plugins
+          if-no-files-found: error
+          path: ${{ github.workspace }}/plugins/**/build/outputs/*.zip
