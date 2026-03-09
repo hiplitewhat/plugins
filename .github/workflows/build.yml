@@ -6,8 +6,7 @@ on:
   push:
     branches:
       - '**'               # triggers on all branches
-    branches-ignore:
-      - main               # but ignores main
+    # but ignores main
 
 jobs:
   build:
