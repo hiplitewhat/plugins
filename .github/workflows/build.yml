@@ -1,3 +1,12 @@
+name: "Build"
+
+on:
+  workflow_dispatch: {}  # Allows manual trigger
+  pull_request: {}       # Triggers on PRs
+  push:
+    branches-ignore:
+      - main            # Runs on push to branches other than main
+
 jobs:
   build:
     name: Build Plugins
@@ -14,16 +23,12 @@ jobs:
           java-version: 21
           distribution: temurin
 
-      - name: Verify Java Version
-        run: java -version
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
 
       - name: Build and save errors only
         run: |
           chmod +x gradlew
-          echo "JAVA_HOME is $JAVA_HOME"
           ./gradlew make --no-daemon --stacktrace --info 2> gradle-error.log
           
           if [ -s gradle-error.log ]; then
