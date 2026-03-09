@@ -1,12 +1,11 @@
-name: "Build"
+name: Build
 
 on:
-  workflow_dispatch:        # manual trigger
-  pull_request:             # triggers on PRs
+  workflow_dispatch:
+  pull_request:
   push:
     branches:
-      - '**'               # triggers on all branches
-    # but ignores main
+      - main
 
 jobs:
   build:
@@ -15,29 +14,38 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v6
 
       - name: Setup JDK 21
         uses: actions/setup-java@v5
         with:
-          java-version: 21
           distribution: temurin
+          java-version: 21
+          cache: gradle
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Build and save errors only
+      - name: Make Gradle executable
+        run: chmod +x gradlew
+
+      - name: Build project and save logs
         run: |
-          chmod +x gradlew
-          ./gradlew make --no-daemon --stacktrace --info 2> gradle-error.log
-          
-          if [ -s gradle-error.log ]; then
-            echo "Gradle errors detected:"
-            cat gradle-error.log
-          else
-            echo "No errors detected."
-          fi
+          ./gradlew make --no-daemon --stacktrace --info 2>&1 | tee gradle.log
+
+      - name: Extract errors from log
+        if: always()
+        run: |
+          echo "Checking for errors..."
+          grep -i "error" gradle.log || echo "No errors detected."
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: gradle-logs
+          path: gradle.log
 
       - name: Upload plugin artifacts
         if: success()
@@ -45,4 +53,4 @@ jobs:
         with:
           name: plugins
           if-no-files-found: error
-          path: ${{ github.workspace }}/plugins/**/build/outputs/*.zip
+          path: plugins/**/build/outputs/*.zip
