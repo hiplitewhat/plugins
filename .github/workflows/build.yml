@@ -1,11 +1,13 @@
 name: "Build"
 
 on:
-  workflow_dispatch: {}  # Allows manual trigger
-  pull_request: {}       # Triggers on PRs
+  workflow_dispatch:        # manual trigger
+  pull_request:             # triggers on PRs
   push:
+    branches:
+      - '**'               # triggers on all branches
     branches-ignore:
-      - main            # Runs on push to branches other than main
+      - main               # but ignores main
 
 jobs:
   build:
